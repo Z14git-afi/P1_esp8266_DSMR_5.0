@@ -1,8 +1,6 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 
-#include "secrets.h"
-
 #define BAUD_RATE 115200
 #define P1_MAXLINELENGTH 1024
 
@@ -18,6 +16,7 @@ const char* mqtt_pass   = MQTT_PASS;
 
 const char* mqtt_telegram_topic = "p1/fulltelegram";
 const char* mqtt_alive_topic    = "p1/alive";
+const char* mqtt_prefix_topic   = "p1/data";
 
 WiFiClient espClient;
 PubSubClient mqttClient(espClient);
@@ -108,6 +107,30 @@ void send_full_telegram(const String& data) {
   } else {
     Serial.println("❌ MQTT siuntimas nepavyko.");
   }
+
+  // Papildomai: siųsti kiekvieną eilutę kaip atskirą temą
+  int start = 0;
+  while (start < data.length()) {
+    int end = data.indexOf('\n', start);
+    if (end == -1) break;
+    String line = data.substring(start, end);
+    start = end + 1;
+
+    if (line.indexOf('(') > 0) {
+      String obis = line.substring(0, line.indexOf('('));
+      String value = line.substring(line.indexOf('(') + 1);
+      value.replace(")", "");
+      int unitIndex = value.indexOf('*');
+      if (unitIndex >= 0) {
+        value = value.substring(0, unitIndex); // pašalina vienetus
+      }
+
+      obis.replace(":", "_"); // MQTT temoje vietoj ':' naudosime '_'
+
+      String topic = String(mqtt_prefix_topic) + "/" + obis;
+      mqttClient.publish(topic.c_str(), value.c_str());
+    }
+  }
 }
 
 void send_alive_status() {
@@ -126,7 +149,6 @@ void setup() {
   Serial.setRxBufferSize(P1_MAXLINELENGTH);
   Serial.println("P1 skaitymas su CRC + MQTT siuntimas");
 
-  // Invertavimas RX (jei reikalingas)
   USC0(UART0) |= BIT(UCRXI);
 
   setup_wifi();
@@ -139,13 +161,12 @@ void loop() {
   }
   mqttClient.loop();
 
-  // === Telegrama iš Serial ===
   if (Serial.available()) {
     int len = Serial.readBytesUntil('\n', telegram, P1_MAXLINELENGTH - 1);
     telegram[len] = '\0';
     String line = String(telegram);
 
-    Serial.println(line); // rodom konsolėje
+    Serial.println(line);
 
     if (line.startsWith("/")) {
       fullTelegram = line + "\n";
@@ -153,7 +174,7 @@ void loop() {
     } else if (insideTelegram) {
       fullTelegram += line + "\n";
       if (line.startsWith("!")) {
-        fullTelegram += "\n"; // optional
+        fullTelegram += "\n";
 
         if (validate_crc(fullTelegram)) {
           send_full_telegram(fullTelegram);
@@ -167,7 +188,6 @@ void loop() {
     }
   }
 
-  // === Gyvybės signalas kas 1s ===
   unsigned long now = millis();
   if (now - lastAliveSent > 1000) {
     send_alive_status();
