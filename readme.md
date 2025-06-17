@@ -61,7 +61,7 @@ Telegrama prasideda `/`, baigiasi `!` ir turi 4 simbolių CRC. Pvz:
 1-0:2.8.0(000123.456*kWh)
 !1234
 ```
-
+Nuoroda su paaiškinimais https://www.eso.lt/web/storage/public/uploads/2025/04/p1-duomenu-modelis_v2.1_web.xlsx
 ## 🛠️ Kompiliavimas
 
 * Naudoti Arduino IDE

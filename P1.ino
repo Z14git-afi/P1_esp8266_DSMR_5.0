@@ -4,6 +4,8 @@
 #define BAUD_RATE 115200
 #define P1_MAXLINELENGTH 1024
 
+#include "secrets.h"
+
 // Wifi
 const char* ssid     = WIFI_SSID;
 const char* password = WIFI_PASSWORD;
